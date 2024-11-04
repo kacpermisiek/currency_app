@@ -1,4 +1,5 @@
 from http import HTTPStatus
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, FastAPI
 from sqlalchemy.orm import Session
@@ -7,9 +8,11 @@ from currency_app.api.deps import get_db
 from currency_app.api.utils import (
     add_order_to_table,
     get_order_with_converted_amount,
+    get_orders_list,
     put_order,
 )
 from currency_app.models.order import Order as OrderModel
+from currency_app.models.order import OrderStatus
 from currency_app.schemas.order import (
     OrderCreateSchema,
     OrderGetSchema,
@@ -47,6 +50,17 @@ async def update_order(
 )
 async def get_order(order_id: str, db: Session = Depends(get_db)):
     return get_order_with_converted_amount(db, order_id)
+
+
+@orders.get(
+    "/",
+    response_model=List[OrderGetSchema],
+    status_code=HTTPStatus.OK,
+)
+def get_list_of_orders(
+    status: Optional[OrderStatus] = None, db: Session = Depends(get_db)
+):
+    return get_orders_list(db, status)
 
 
 app.include_router(orders)

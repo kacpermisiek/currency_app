@@ -1,5 +1,8 @@
+from http import HTTPStatus
+from typing import Optional
+
 from fastapi import HTTPException
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session
 
 from currency_app.clients.nbp_client import NBPClient
@@ -25,10 +28,22 @@ def add_order_to_table(db: Session, order: OrderCreateSchema) -> OrderGetSchema:
     return OrderGetSchema.model_validate(new_order)
 
 
+def get_orders_list(db: Session, status: Optional[str]) -> list[OrderGetSchema]:
+    query = db.query(OrderModel)
+    if status is not None:
+        query = query.filter(OrderModel.status == status)
+    return [OrderGetSchema.model_validate(order) for order in query.all()]
+
+
 def get_order_by_id(db: Session, order_id: str) -> OrderModel:
-    order = db.query(OrderModel).get(order_id)
+    try:
+        order = db.query(OrderModel).get(order_id)
+    except DataError:
+        raise HTTPException(
+            status_code=HTTPStatus.BAD_REQUEST, detail="Invalid order id"
+        )
     if order is None:
-        raise HTTPException(status_code=404, detail="Order not found")
+        raise HTTPException(status_code=HTTPStatus.NOT_FOUND, detail="Order not found")
     return order
 
 

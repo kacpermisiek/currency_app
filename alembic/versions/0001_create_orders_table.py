@@ -22,7 +22,7 @@ depends_on = None
 def upgrade():
     op.create_table(
         "orders",
-        sa.Column("id", UUID, primary_key=True, default=uuid.uuid4),
+        sa.Column("id", UUID, primary_key=True, default=lambda: str(uuid.uuid4())),
         sa.Column("customer_name", sa.String(255), nullable=False),
         sa.Column("total_amount", sa.Float, nullable=False),
         sa.Column("currency", sa.String(16), nullable=False),
@@ -37,5 +37,4 @@ def upgrade():
 
 def downgrade():
     op.drop_table("orders")
-    # remove enum
     op.execute("DROP TYPE orderstatus")

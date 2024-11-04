@@ -1,11 +1,12 @@
 import json
 from http import HTTPStatus
-from typing import Any
+from typing import Any, Optional
+from unittest.mock import patch
 
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import patch
-from currency_app.models.order import Order
+
+from currency_app.models.order import Order, OrderStatus
 
 
 @pytest.fixture
@@ -78,8 +79,13 @@ def test_put_non_existing_order_should_return_not_found_response(
     assert response.status_code == HTTPStatus.NOT_FOUND, response.text
 
 
-def when_order_is_created(db_api) -> str:
-    order = Order(customer_name="Juan Pablo", total_amount=100.0, currency="USD")
+def when_order_is_created(db_api, status: Optional[OrderStatus] = None) -> str:
+    order = Order(
+        customer_name="Juan Pablo",
+        total_amount=100.0,
+        currency="USD",
+        status=status or OrderStatus.PENDING,
+    )
     db_api.add(order)
     db_api.commit()
     return order.id
@@ -115,6 +121,13 @@ def test_get_non_existing_order_should_return_not_found_response(
     assert response.status_code == HTTPStatus.NOT_FOUND, response.text
 
 
+def test_get_wrong_order_id_should_return_bad_request_response(
+    db_api, test_client: TestClient
+):
+    response = test_client.get("/orders/123")
+    assert response.status_code == HTTPStatus.BAD_REQUEST, response.text
+
+
 def test_get_existing_order_should_return_proper_response(
     db_api, test_client: TestClient, mock_nbp_client
 ):
@@ -129,3 +142,27 @@ def test_get_existing_order_should_return_proper_response(
     assert response_body["status"] == "Pending"
     assert response_body["id"] == str(order_id)
     assert response_body["converted_amount"] == 398.69
+
+
+def test_get_list_of_orders_should_return_list_of_orders(
+    db_api, test_client: TestClient
+):
+    [when_order_is_created(db_api) for _ in range(3)]
+
+    response = test_client.get("/orders")
+    assert response.status_code == HTTPStatus.OK, response.text
+    response_body = response.json()
+    assert len(response_body) == 3
+
+
+def test_get_list_of_orders_with_shipped_status_should_return_list_of_orders_with_shipped_status(
+    db_api, test_client: TestClient
+):
+    [when_order_is_created(db_api) for _ in range(10)]
+    [when_order_is_created(db_api, status=OrderStatus.SHIPPED) for _ in range(5)]
+
+    response = test_client.get("/orders?status=Shipped")
+    assert response.status_code == HTTPStatus.OK, response.text
+    response_body = response.json()
+    assert len(response_body) == 5
+    assert all([order["status"] == "Shipped" for order in response_body])

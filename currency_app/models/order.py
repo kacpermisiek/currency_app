@@ -16,7 +16,7 @@ class OrderStatus(str, enum.Enum):
 class Order(Base):
     __tablename__ = "orders"
 
-    id = Column(UUID, primary_key=True, default=str(uuid.uuid4()))
+    id = Column(UUID, primary_key=True, default=lambda: str(uuid.uuid4()))
     customer_name = Column(String(255), nullable=False)
     total_amount = Column(Float, nullable=False)
     currency = Column(String(16), nullable=False)
